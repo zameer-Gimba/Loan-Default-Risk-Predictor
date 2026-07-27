@@ -45,12 +45,21 @@ def main():
     col1, col2 = st.columns([1.4, 1])
 
     with col1:
-        st.subheader("Upload the three CSV files")
-        demo_file = st.file_uploader("traindemographics.csv", type=["csv"])
-        perf_file = st.file_uploader("trainperf.csv", type=["csv"])
-        prev_file = st.file_uploader("trainprevloans.csv", type=["csv"])
+        st.subheader("Data Source Status")
+        
+        # Configure file paths to point directly to your GitHub repository storage
+        demo_path = Path("data/traindemographics.csv")
+        perf_path = Path("data/trainperf.csv")
+        prev_path = Path("data/trainprevloans.csv")
 
-        run_btn = st.button("Generate Predictions", type="primary")
+        # Verify that all three CSV files are saved in your data/ folder
+        if demo_path.exists() and perf_path.exists() and prev_path.exists():
+            st.success("🔄 Repository datasets detected in 'data/' folder successfully!")
+            run_btn = st.button("Generate Predictions from Repository Data", type="primary")
+        else:
+            st.error("Missing raw CSV files in your repository 'data/' folder. Please ensure they are uploaded to GitHub.")
+            st.info("Expected files: data/traindemographics.csv, data/trainperf.csv, data/trainprevloans.csv")
+            run_btn = False
 
     with col2:
         st.subheader("Model Summary")
@@ -61,46 +70,41 @@ def main():
             st.json(bundle["test_metrics"])
 
     if run_btn:
-        if not (demo_file and perf_file and prev_file):
-            st.error("Please upload all three CSV files first.")
-            st.stop()
+        with st.spinner("Processing repository data and generating predictions..."):
+            X, y = prepare_inference_data(
+                demographics_path=demo_path,
+                perf_path=perf_path,
+                prevloans_path=prev_path,
+            )
 
-        # REMOVED: Unused pd.read_csv lines that were causing the pointer drain error
+            probs = pipeline.predict_proba(X)[:, 1]
+            preds = (probs >= threshold).astype(int)
 
-        X, y = prepare_inference_data(
-            demographics_path=demo_file,
-            perf_path=perf_file,
-            prevloans_path=prev_file,
-        )
+            results = X.copy()
+            results["default_probability"] = probs
+            results["predicted_default"] = preds
+            results["risk_label"] = results["predicted_default"].map({1: "High Risk", 0: "Low Risk"})
 
-        probs = pipeline.predict_proba(X)[:, 1]
-        preds = (probs >= threshold).astype(int)
+            st.success("Predictions generated successfully.")
+            st.subheader("Prediction Preview")
+            st.dataframe(results[["default_probability", "predicted_default", "risk_label"]].head(50), use_container_width=True)
 
-        results = X.copy()
-        results["default_probability"] = probs
-        results["predicted_default"] = preds
-        results["risk_label"] = results["predicted_default"].map({1: "High Risk", 0: "Low Risk"})
+            st.subheader("Risk Distribution")
+            fig, ax = plt.subplots()
+            results["risk_label"].value_counts().plot(kind="bar", ax=ax)
+            ax.set_xlabel("Risk Label")
+            ax.set_ylabel("Count")
+            ax.set_title("Predicted Risk Distribution")
+            st.pyplot(fig)
 
-        st.success("Predictions generated successfully.")
-        st.subheader("Prediction Preview")
-        st.dataframe(results[["default_probability", "predicted_default", "risk_label"]].head(50), use_container_width=True)
-
-        st.subheader("Risk Distribution")
-        fig, ax = plt.subplots()
-        results["risk_label"].value_counts().plot(kind="bar", ax=ax)
-        ax.set_xlabel("Risk Label")
-        ax.set_ylabel("Count")
-        ax.set_title("Predicted Risk Distribution")
-        st.pyplot(fig)
-
-        st.subheader("Download Predictions")
-        csv = results[["default_probability", "predicted_default", "risk_label"]].to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name="loan_default_predictions.csv",
-            mime="text/csv",
-        )
+            st.subheader("Download Predictions")
+            csv = results[["default_probability", "predicted_default", "risk_label"]].to_csv(index=False).encode("utf-8")
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name="loan_default_predictions.csv",
+                mime="text/csv",
+            )
 
     st.divider()
     st.subheader("What this project does")
