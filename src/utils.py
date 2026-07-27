@@ -60,7 +60,7 @@ def find_column(
 
 
 def safe_to_datetime(series: pd.Series) -> pd.Series:
-    return pd.to_datetime(series, errors="coerce", infer_datetime_format=True)
+    return pd.to_datetime(series, errors="coerce")
 
 
 def coerce_binary_target(y: pd.Series) -> pd.Series:
