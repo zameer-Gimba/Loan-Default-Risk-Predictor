@@ -1,4 +1,5 @@
 # app/streamlit_app.py
+from __future__ import annotations
 import os
 import sys
 
@@ -8,8 +9,6 @@ if root_path not in sys.path:
     sys.path.insert(0, root_path)
 
 from src.data_prep import prepare_inference_data
-
-from __future__ import annotations
 
 from pathlib import Path
 
