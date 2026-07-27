@@ -1,4 +1,13 @@
 # app/streamlit_app.py
+import os
+import sys
+
+# This forces Python to look at the root repository folder
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if root_path not in sys.path:
+    sys.path.insert(0, root_path)
+
+from src.data_prep import prepare_inference_data
 
 from __future__ import annotations
 
