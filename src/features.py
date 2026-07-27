@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -14,6 +13,21 @@ from src.utils import (
     safe_to_datetime,
     safe_divide,
 )
+
+
+def custom_series_datetime(df: pd.DataFrame, col_name: str) -> pd.Series:
+    """
+    Robust column-level datetime converter. Coerces errors safely 
+    and removes timezone offsets to prevent calculation type errors.
+    """
+    try:
+        converted = pd.to_datetime(df[col_name], errors="coerce")
+        if hasattr(converted.dt, "tz_localize") and converted.dt.tz is not None:
+            converted = converted.dt.tz_localize(None)
+        return converted
+    except Exception:
+        # Fallback to structural processing if the series format is deeply broken
+        return pd.to_datetime(pd.Series(df[col_name].values), errors="coerce")
 
 
 def build_demographics_features(df: pd.DataFrame, reference_date: Optional[pd.Timestamp] = None) -> pd.DataFrame:
@@ -27,9 +41,12 @@ def build_demographics_features(df: pd.DataFrame, reference_date: Optional[pd.Ti
 
     out = df.copy()
 
-    if birthdate_col is not None:
-        out[birthdate_col] = safe_to_datetime(out[birthdate_col])
+    if birthdate_col is not None and birthdate_col in out.columns:
+        out[birthdate_col] = custom_series_datetime(out, birthdate_col)
         ref_date = reference_date if reference_date is not None else pd.Timestamp.today().normalize()
+        if hasattr(ref_date, "tz_localize") and ref_date.tz is not None:
+            ref_date = ref_date.tz_localize(None)
+            
         out["age_years"] = (ref_date - out[birthdate_col]).dt.days / 365.25
         out["birth_year"] = out[birthdate_col].dt.year
         out["birth_month"] = out[birthdate_col].dt.month
@@ -59,21 +76,22 @@ def build_perf_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
     close_col = find_column(out, ["closeddate", "close_date", "date_closed"], required=False)
 
     for c in [approved_col, creation_col, due_col, close_col]:
-        if c is not None:
-            out[c] = safe_to_datetime(out[c])
+        if c is not None and c in out.columns:
+            out[c] = custom_series_datetime(out, c)
 
-    if approved_col is not None:
+    if approved_col is not None and approved_col in out.columns:
         out["approved_year"] = out[approved_col].dt.year
         out["approved_month"] = out[approved_col].dt.month
         out["approved_weekday"] = out[approved_col].dt.weekday
 
-    if creation_col is not None:
+    if creation_col is not None and creation_col in out.columns:
         out["creation_year"] = out[creation_col].dt.year
         out["creation_month"] = out[creation_col].dt.month
         out["creation_weekday"] = out[creation_col].dt.weekday
 
-    if approved_col is not None and creation_col is not None:
-        out["approval_delay_days"] = (out[approved_col] - out[creation_col]).dt.days
+    if (approved_col in out.columns) and (creation_col in out.columns):
+        if approved_col is not None and creation_col is not None:
+            out["approval_delay_days"] = (out[approved_col] - out[creation_col]).dt.days
 
     # Keep raw date columns out of the model features
     for c in [approved_col, creation_col, due_col, close_col]:
@@ -101,10 +119,10 @@ def build_prevloan_features(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
     for c in [due_col, close_col, approved_col]:
-        if c is not None:
-            out[c] = safe_to_datetime(out[c])
+        if c is not None and c in out.columns:
+            out[c] = custom_series_datetime(out, c)
 
-    if due_col is not None and close_col is not None:
+    if (due_col in out.columns) and (close_col in out.columns) and due_col is not None and close_col is not None:
         out["days_to_repay"] = (out[close_col] - out[due_col]).dt.days
         out["late_repayment_flag"] = (out[close_col] > out[due_col]).astype(int)
     else:
@@ -120,16 +138,16 @@ def build_prevloan_features(df: pd.DataFrame) -> pd.DataFrame:
         "days_to_repay_std": ("days_to_repay", "std"),
     }
 
-    if loannumber_col is not None:
+    if loannumber_col is not None and loannumber_col in out.columns:
         agg_dict["max_loannumber"] = (loannumber_col, "max")
         agg_dict["unique_loannumber"] = (loannumber_col, "nunique")
 
-    if loanamount_col is not None:
+    if loanamount_col is not None and loanamount_col in out.columns:
         agg_dict["prev_loanamount_mean"] = (loanamount_col, "mean")
         agg_dict["prev_loanamount_max"] = (loanamount_col, "max")
         agg_dict["prev_loanamount_sum"] = (loanamount_col, "sum")
 
-    if term_col is not None:
+    if term_col is not None and term_col in out.columns:
         agg_dict["prev_term_mean"] = (term_col, "mean")
         agg_dict["prev_term_max"] = (term_col, "max")
 
@@ -163,9 +181,15 @@ def build_model_frame(
     # If there is a date in perf, use it as a reference for age calculation.
     for col in perf.columns:
         if "date" in col:
-            reference_date = pd.to_datetime(perf[col], errors="coerce").max()
-            if pd.notna(reference_date):
-                break
+            try:
+                parsed_dates = pd.to_datetime(perf[col], errors="coerce")
+                if hasattr(parsed_dates.dt, "tz_localize") and parsed_dates.dt.tz is not None:
+                    parsed_dates = parsed_dates.dt.tz_localize(None)
+                reference_date = parsed_dates.max()
+                if pd.notna(reference_date):
+                    break
+            except Exception:
+                continue
 
     demo_feat = build_demographics_features(demographics, reference_date=reference_date)
     prev_feat = build_prevloan_features(prevloans)
