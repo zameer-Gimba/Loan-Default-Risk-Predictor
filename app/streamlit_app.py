@@ -2,15 +2,12 @@
 from __future__ import annotations
 import os
 import sys
+from pathlib import Path
 
 # This forces Python to look at the root repository folder
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
-
-from src.data_prep import prepare_inference_data
-
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -68,9 +65,7 @@ def main():
             st.error("Please upload all three CSV files first.")
             st.stop()
 
-        demographics = pd.read_csv(demo_file)
-        perf = pd.read_csv(perf_file)
-        prevloans = pd.read_csv(prev_file)
+        # REMOVED: Unused pd.read_csv lines that were causing the pointer drain error
 
         X, y = prepare_inference_data(
             demographics_path=demo_file,
