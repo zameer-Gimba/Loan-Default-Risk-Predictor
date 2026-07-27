@@ -38,9 +38,6 @@ streamlit run app/streamlit_app.py
 ```
 python test.py
 ```
-
----
-
 ## Run order
 
 ```bash
