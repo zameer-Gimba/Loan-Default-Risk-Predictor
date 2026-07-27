@@ -38,7 +38,7 @@ streamlit run app/streamlit_app.py
 ```
 python test.py
 ```
-## Run order
+## Run Order
 
 ```bash
 python -m src.train
