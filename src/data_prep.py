@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Tuple
-
+from typing import Tuple, Any
 import pandas as pd
 
 from src.features import build_model_frame
 
 
-def load_csv(path: str | Path) -> pd.DataFrame:
-    return pd.read_csv(path)
+def load_csv(path_or_buffer: Any) -> pd.DataFrame:
+    """
+    Loads a CSV file. Accepts local string/Path file paths or 
+    Streamlit uploaded file buffer streams.
+    """
+    return pd.read_csv(path_or_buffer)
 
 
 def load_raw_datasets(
-    demographics_path: str | Path,
-    perf_path: str | Path,
-    prevloans_path: str | Path,
+    demographics_path: Any,
+    perf_path: Any,
+    prevloans_path: Any,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Loads all three required datasets from paths or file buffers."""
     demographics = load_csv(demographics_path)
     perf = load_csv(perf_path)
     prevloans = load_csv(prevloans_path)
@@ -26,10 +29,11 @@ def load_raw_datasets(
 
 
 def prepare_training_data(
-    demographics_path: str | Path,
-    perf_path: str | Path,
-    prevloans_path: str | Path,
-):
+    demographics_path: Any,
+    perf_path: Any,
+    prevloans_path: Any,
+) -> Tuple[pd.DataFrame, pd.Series]:
+    """Loads raw datasets and transforms them into feature and target matrices."""
     demographics, perf, prevloans = load_raw_datasets(
         demographics_path, perf_path, prevloans_path
     )
@@ -38,11 +42,12 @@ def prepare_training_data(
 
 
 def prepare_inference_data(
-    demographics_path: str | Path,
-    perf_path: str | Path,
-    prevloans_path: str | Path,
-):
+    demographics_path: Any,
+    perf_path: Any,
+    prevloans_path: Any,
+) -> Tuple[pd.DataFrame, pd.Series]:
     """
     Same as training prep, but kept separate for clarity in the Streamlit app.
+    Accepts file buffers directly from the user interface.
     """
     return prepare_training_data(demographics_path, perf_path, prevloans_path)
