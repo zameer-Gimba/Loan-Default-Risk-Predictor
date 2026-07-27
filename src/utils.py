@@ -59,8 +59,23 @@ def find_column(
     return None
 
 
-def safe_to_datetime(series: pd.Series) -> pd.Series:
-    return pd.to_datetime(series, errors="coerce")
+def safe_to_datetime(series: Any) -> Any:
+    """
+    Safely converts input data to datetime. Handles pandas Series,
+    single strings, or unexpected types gracefully without crashing.
+    """
+    try:
+        # If it's a pandas Series or has copy properties, convert it directly
+        if hasattr(series, "copy") or isinstance(series, pd.Series):
+            return pd.to_datetime(series, errors="coerce")
+        # If it's a list, numpy array, or array-like structure
+        if isinstance(series, (list, np.ndarray)):
+            return pd.to_datetime(pd.Series(series), errors="coerce")
+        # If it's a single string or raw value scalar
+        return pd.to_datetime(pd.Series([series]), errors="coerce").iloc[0]
+    except Exception:
+        # Fallback to returning the input if parsing completely fails
+        return series
 
 
 def coerce_binary_target(y: pd.Series) -> pd.Series:
