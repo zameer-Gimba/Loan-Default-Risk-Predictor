@@ -45,3 +45,4 @@ python -m src.train
 streamlit run app/streamlit_app.py
 python test.py
 ```
+Streamlit: https://loan-default-risk-predictor-lgbm.streamlit.app/)
